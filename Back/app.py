@@ -1,14 +1,19 @@
 import os
-from typing import List, Dict, Any
+from typing import List
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 
-from db import supabase
-from models import TareaCreate, TareaOut, TareaUpdate
-
-TABLE_NAME = "Tarea"
+from .models import EstadoTarea, TareaCreate, TareaOut, TareaUpdate
+from .storage import (
+    create_task,
+    delete_task,
+    get_storage_mode,
+    get_task,
+    list_tasks,
+    update_task,
+)
 
 app = FastAPI(title="Gestor de Tareas API")
 
@@ -31,31 +36,7 @@ async def root():
 
 @app.get("/health", tags=["health"])
 async def health_check():
-    return {"status": "ok"}
-
-
-def _normalize_row(row: Dict[str, Any]) -> Dict[str, Any]:
-    if "crateAt" not in row:
-        if "createdAt" in row:
-            row["crateAt"] = row["createdAt"]
-        elif "created_at" in row:
-            row["crateAt"] = row["created_at"]
-    return row
-
-
-def _select_all() -> List[dict]:
-    response = supabase.table(TABLE_NAME).select("*").order("id").execute()
-    data = response.data or []
-    return [_normalize_row(item) for item in data]
-
-
-def _select_one(tarea_id: int) -> dict:
-    response = (
-        supabase.table(TABLE_NAME).select("*").eq("id", tarea_id).single().execute()
-    )
-    if not response.data:
-        raise HTTPException(status_code=404, detail="Tarea no encontrada")
-    return _normalize_row(response.data)
+    return {"status": "ok", "storage": get_storage_mode()}
 
 
 @app.get(
@@ -64,8 +45,8 @@ def _select_one(tarea_id: int) -> dict:
 @app.get(
     "/tareas", response_model=List[TareaOut], response_model_by_alias=False, tags=["tareas"]
 )
-def listar_tareas():
-    return _select_all()
+def listar_tareas(estado: EstadoTarea | None = Query(default=None)):
+    return list_tasks(estado.value if estado else None)
 
 
 @app.get(
@@ -81,7 +62,7 @@ def listar_tareas():
     tags=["tareas"],
 )
 def obtener_tarea(tarea_id: int):
-    return _select_one(tarea_id)
+    return get_task(tarea_id)
 
 
 @app.post(
@@ -102,10 +83,7 @@ def crear_tarea(tarea: TareaCreate):
     data = jsonable_encoder(
         tarea.model_dump(by_alias=True, exclude_none=True, exclude={"crateAt"})
     )
-    response = supabase.table(TABLE_NAME).insert(data).execute()
-    if not response.data:
-        raise HTTPException(status_code=400, detail="No se pudo crear la tarea")
-    return _normalize_row(response.data[0])
+    return create_task(data)
 
 
 @app.put(
@@ -128,16 +106,10 @@ def actualizar_tarea(tarea_id: int, tarea: TareaUpdate):
         raise HTTPException(
             status_code=400, detail="No hay campos para actualizar"
         )
-    response = supabase.table(TABLE_NAME).update(data).eq("id", tarea_id).execute()
-    if not response.data:
-        raise HTTPException(status_code=404, detail="Tarea no encontrada")
-    return _normalize_row(response.data[0])
+    return update_task(tarea_id, data)
 
 
 @app.delete("/tasks/{tarea_id}", tags=["tareas"])
 @app.delete("/tareas/{tarea_id}", tags=["tareas"])
 def eliminar_tarea(tarea_id: int):
-    response = supabase.table(TABLE_NAME).delete().eq("id", tarea_id).execute()
-    if not response.data:
-        raise HTTPException(status_code=404, detail="Tarea no encontrada")
-    return {"deleted": tarea_id}
+    return delete_task(tarea_id)
