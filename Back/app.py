@@ -5,15 +5,26 @@ from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 
-from .models import EstadoTarea, TareaCreate, TareaOut, TareaUpdate
-from .storage import (
-    create_task,
-    delete_task,
-    get_storage_mode,
-    get_task,
-    list_tasks,
-    update_task,
-)
+try:
+    from .models import EstadoTarea, TareaCreate, TareaOut, TareaUpdate
+    from .storage import (
+        create_task,
+        delete_task,
+        get_storage_mode,
+        get_task,
+        list_tasks,
+        update_task,
+    )
+except ImportError:
+    from models import EstadoTarea, TareaCreate, TareaOut, TareaUpdate
+    from storage import (
+        create_task,
+        delete_task,
+        get_storage_mode,
+        get_task,
+        list_tasks,
+        update_task,
+    )
 
 app = FastAPI(title="Gestor de Tareas API")
 

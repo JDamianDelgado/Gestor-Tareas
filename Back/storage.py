@@ -9,7 +9,10 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
 
-from .db import supabase
+try:
+    from .db import supabase
+except ImportError:
+    from db import supabase
 
 TABLE_NAME = "Tarea"
 CSV_HEADERS = ["id", "title", "description", "estado", "crateAt"]
